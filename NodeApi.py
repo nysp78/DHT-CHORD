@@ -11,7 +11,7 @@ current_node = None
 @app.route("/")
 def startup():
   global current_node
-  ip_addr = app.config["IP"]
+  ip_addr = app.config["IP"] 
   port = app.config["PORT"]
   print(ip_addr, port)
   try:
