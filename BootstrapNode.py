@@ -1,16 +1,27 @@
-from Node import Node
+from Node import Node, hashing
 from hashlib import sha1
 from threading import Thread, Lock
 import requests
 import sys
 import time
+import json
 from flask.json import JSONEncoder, JSONDecoder
 
 class Bootstrap(Node):
     def __init__(self, ip_addr, port):
        super(Bootstrap, self).__init__(ip_addr, port)
        self.number_of_nodes = 0
-       self.nodes_dict = {}
+       self.nodes_dict = {"127.0.0.1:5000": 5000}
+       self.total_storage = {}
+
+
+    def collect_total_data(self):
+        for address in self.nodes_dict.keys():
+            url = "http://{0}/node/get_storage/".format(address)
+            reply = requests.get(url)
+            self.total_storage[address] = reply.text
+        return json.dumps(self.total_storage)
+
 
 
     #request from current node to join a node with address 
@@ -25,25 +36,17 @@ class Bootstrap(Node):
             return "Error with sending successesor"
 
 
-        if self.successor == self.host or Bootstrap.between(sha1(address.encode()).hexdigest(), self.node_id,sha1(self.successor.encode()).hexdigest()):
+        if self.successor == self.host or Bootstrap.between(sha1(address.encode()).hexdigest(), 
+                                                                self.node_id,sha1(self.successor.encode()).hexdigest()):
            print("MPHKA")
            print("ADDRESSS", address)
            self.update_successor(address)
          
         Bootstrap.stabilize_node(self)
 
-    def find_successor(self, help_node, target_node):
-        try:
-            url = "http://{0}/node/find_successor/{1}".format(help_node, target_node)
-            request = requests.get(url)
-            if request.status_code == 200:
-                return request.text #5000
-        except:
-            raise ConnectionError
-
     
     def get_total_nodes(self):
-        return self.number_of_nodes
+        return "total nodes in system:" + str(self.number_of_nodes + 1)
 
     
 

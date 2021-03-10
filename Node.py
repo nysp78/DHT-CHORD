@@ -4,6 +4,7 @@ import requests
 import sys
 import time
 from flask.json import JSONEncoder, JSONDecoder
+import json
     
 def hashing(value):
     return sha1(value.encode()).hexdigest()
@@ -16,7 +17,7 @@ class Node(object):
         self.node_id = sha1(self.host.encode()).hexdigest()
         self.successor = self.host
         self.predecessor = self.host
-        self.succ_lock = Lock() #lock to write succ
+        self.succ_lock = Lock() #loSck to write succ
         self.pred_lock = Lock() #lock to write pred
         self.node_storage = {}
         self.stabilizer_thread = Thread(target = self.stabilize, args=(2,)) #periodic operation
@@ -30,8 +31,8 @@ class Node(object):
     def get_pred(self):
         return self.predecessor
 
-    def hashing(self,value):
-        return sha1(value.encode()).hexdigest()
+    def get_storage(self):
+        return json.dumps(self.node_storage, indent = 4) 
 
     #update the successor of the this node
     def update_successor(self, res):
@@ -43,14 +44,32 @@ class Node(object):
             return
 
         else:
-            pass
+            url = "http://{0}/node/transfer_keys/{1}".format(res, self.host)
+            reply = requests.post(url)
+            if reply.status_code != 200:
+                return("error to transfer keys from successor")
 
-        return 
 
     def update_predecessor(self, res):
         self.pred_lock.acquire()
         self.predecessor = res
         self.pred_lock.release()
+
+    def transfer_keys(self, hash_key, target_addr):
+        if target_addr == self.host:
+            return 1
+        hash_key_tostr = str(hash_key)
+        value = self.node_storage[hash_key_tostr]
+        item = hash_key_tostr , value
+        url = "http://{0}/node/send_item/{1}".format(target_addr, item)
+        reply = requests.post(url)
+
+        if reply.status_code==200:
+            self.node_storage.pop(hash_key_tostr)
+            return 1
+        
+        else:
+            return 0
 
     @staticmethod
     def between(x, a, b):
@@ -72,19 +91,28 @@ class Node(object):
 
     #successor sets node as its pred
     def notify(self, addr):
-        addr_id = self.hashing(addr)
+        addr_id = hashing(addr)
         pred = self.get_pred()
-        pred_id = self.hashing(pred)
+        pred_id = hashing(pred)
         if pred == self.host or Node.between(addr_id, pred_id, self.node_id):
             self.update_predecessor(addr)
             return True
         return False
 
+    def find_successor(self, help_node, target_node):
+        try:
+            url = "http://{0}/node/find_successor/{1}".format(help_node, target_node)
+            request = requests.get(url)
+            if request.status_code == 200:
+                return request.text #5000
+        except:
+            raise ConnectionError
+
+
     @staticmethod
     def stabilize_node(node):
         succ = node.get_succ()
         pred = node.get_pred()
-        print("succ:",succ,  "????", "pred:", pred)
 
         if succ != node.host: #node asks its successor for its predecessor
             url = 'http://{0}/node/get_pred'.format(succ)
@@ -115,7 +143,6 @@ class Node(object):
     
     def stabilize(self, interval):
         while 1:
-            print("PERIODICALLY")
             Node.stabilize_node(self)
             time.sleep(interval)
 

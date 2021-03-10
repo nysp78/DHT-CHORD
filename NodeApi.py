@@ -2,7 +2,8 @@ from flask import Flask, redirect, url_for, request, logging, abort
 from hashlib import sha1
 import os
 import requests
-from Node import Node
+import json
+from Node import Node, hashing
 from BootstrapNode import Bootstrap
 
 app = Flask(__name__)
@@ -39,7 +40,7 @@ def check_server():
 @app.route('/node/join/', methods=['POST', 'PUT'])
 def join():
     addrs = ["127.0.0.1:5001", "127.0.0.1:5002", "127.0.0.1:5003", "127.0.0.1:5004", "127.0.0.1:5005", "127.0.0.1:5006",
-    "127.0.0.1:5007", "127.0.0.1:5008", "127.0.0.1:5009", "127.0.0.1:5010"]
+    "127.0.0.1:5007", "127.0.0.1:5008", "127.0.0.1:5009"]
 
     try:
         for addr in addrs:
@@ -49,7 +50,12 @@ def join():
     except:
         raise ConnectionAbortedError
 
-     
+#bootstrap tells us how many nodes we have in the system
+@app.route("/node/get_total_nodes/", methods=["GET"])
+def return_nodes():
+    return current_node.get_total_nodes()
+
+
 #bootstrap sends the succ of current node
 @app.route("/node/send_succ/<succ_id>", methods=["POST"])
 def send_succ(succ_id):
@@ -76,6 +82,25 @@ def notify():
   return "predecessor not updated", 200
 
 
+@app.route("/node/transfer_keys/<target_node>", methods=["POST, PUT"])
+def transfer_keys(target_node):
+    keys = current_node.node_storage.keys() #obtain keys
+    for key in keys:
+        key_unh = int(key.decode())
+        if not Node.between_right(key_unh, hashing(target_node), current_node.node_id):
+            trans_key = current_node.transfer_keys(key_unh, target_node)
+            if trans_key:
+                return "key transfered", 200
+            else:
+                return abort(500)
+
+
+@app.route("/node/send_item/<item>", methods=["POST, PUT"])
+def send_item(item):
+    current_node.node_storage[item[0]] = item[1]
+    return "key set", 200
+
+
 @app.route("/node/find_successor/<target_node>", methods=["GET"])
 def find_successor(target_node):
     successor = current_node.get_succ()
@@ -88,5 +113,80 @@ def find_successor(target_node):
        url = "http://{0}/node/find_successor/{1}".format(successor,target_node) 
        r = requests.get(url)
        return r.text
+
+
+@app.route("/node/insert_pair/<key>/<value>", methods=["POST", "PUT"])
+def insert_pair(key, value):
+    #perform a lookup
+    successor = current_node.find_successor(current_node.host, key)
+
+    #if current node is equal to key succ
+    if successor == current_node.host:
+        current_node.node_storage[key] = value
+        print("SUCCESS!!!!!!!:", key, value)
+        return "pair inserted to Chord", 200
+
+    #else call insert for the successor
+    else:
+        url = "http://{0}/node/insert_pair/{1}/{2}".format(successor, key, value)
+        res = requests.post(url)
+        if res.status_code == 200:
+            return "pair inserted to Chord", 200
+        else:
+            return "ERROR with inserting"
+
+
+@app.route("/node/query_key/<key>", methods=["GET"])
+def query_key(key):
+    if key == "*":
+        return query_all()
+    
+    else:
+        if key in current_node.node_storage.keys():
+            value = current_node.node_storage[key]
+            return value, 200
+
+        else:
+            key_succ = current_node.find_successor(current_node.host, key)
+            if key_succ == current_node.host:
+                return "key Not Found", 500
+        
+            else:
+            #      print("SUCCC:",key_succ, current_node.host)
+                url = "http://{0}/node/query_key/{1}".format(key_succ, key)
+                reply = requests.get(url)
+
+                if reply.status_code == 200:
+                    return reply.text, 200
+            
+                else:
+                    return "Key not found" , 500
+    
+    
+#return the node storage 
+@app.route("/node/get_storage/", methods=["GET"])
+def get_storage():
+    return current_node.get_storage()
+
+
+
+@app.route("/node/collect_total/", methods = ["GET"])
+def collect_total():
+   return current_node.collect_total_data()
+
+
+
+def query_all():
+    url = "http://{0}/node/collect_total/".format("127.0.0.1:5000")
+    reply = requests.get(url)
+    return reply.text
+
+
+
+
+
+    
+
+
 
 
