@@ -11,7 +11,7 @@ current_node = None
 @app.before_first_request
 def startServer():
   global current_node
-  ip_addr = app.config["IP"]
+  ip_addr = app.config["IP"] 
   port = app.config["PORT"]
   isboot = app.config["ISBOOT"]
   print(ip_addr, port)
