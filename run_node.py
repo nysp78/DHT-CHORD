@@ -13,5 +13,5 @@ if __name__ == '__main__':
   NodeApi.app.config["SERVER_NAME"] = "{0}:{1}".format(args.ip_address, args.port)
   NodeApi.app.config["IP"] = args.ip_address
   NodeApi.app.config["PORT"] = args.port
-  NodeApi.app.config["ISBOOT"] = args.bootstrap 
+  NodeApi.app.config["ISBOOT"] = args.bootstrap
   NodeApi.app.run(host=args.ip_address, port=args.port)

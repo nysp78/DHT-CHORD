@@ -6,12 +6,13 @@ import sys
 import time
 import json
 from flask.json import JSONEncoder, JSONDecoder
+from config import *
 
 class Bootstrap(Node):
     def __init__(self, ip_addr, port):
        super(Bootstrap, self).__init__(ip_addr, port)
        self.number_of_nodes = 0
-       self.nodes_dict = {"127.0.0.1:5000": 5000}
+       self.nodes_dict = {BOOTSTRAP_ADDR: BOOTSTRAP_ADDR.split(":")[1]}
        self.total_storage = {}
 
 

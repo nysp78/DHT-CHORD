@@ -5,6 +5,7 @@ import requests
 import json
 from Node import Node, hashing
 from BootstrapNode import Bootstrap
+from config import *
 
 app = Flask(__name__)
 current_node = None
@@ -162,7 +163,7 @@ def query_key(key):
                 else:
                     return "Key not found" , 500
     
-    
+
 #return the node storage 
 @app.route("/node/get_storage/", methods=["GET"])
 def get_storage():
@@ -177,7 +178,7 @@ def collect_total():
 
 
 def query_all():
-    url = "http://{0}/node/collect_total/".format("127.0.0.1:5000")
+    url = "http://{0}/node/collect_total/".format(BOOTSTRAP_ADDR)
     reply = requests.get(url)
     return reply.text
 
