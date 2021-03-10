@@ -21,6 +21,8 @@ class Bootstrap(Node):
         node_successor = self.find_successor(self.host, address)
         url = "http://{0}/node/send_succ/{1}".format(address, node_successor) 
         request = requests.post(url) #send the successor to node with addr
+        if request.status_code!=200:
+            return "Error with sending successesor"
 
 
         if self.successor == self.host or Bootstrap.between(sha1(address.encode()).hexdigest(), self.node_id,sha1(self.successor.encode()).hexdigest()):
@@ -39,18 +41,9 @@ class Bootstrap(Node):
         except:
             raise ConnectionError
 
+    
+    def get_total_nodes(self):
+        return self.number_of_nodes
 
-    #update the successor of the this node
-    def update_successor(self, res):
-        self.succ_lock.acquire()
-        self.successor = res
-        self.succ_lock.release()
-        
-        if res == self.host:
-            return
-
-        else:
-            pass
-
-        return 
+    
 

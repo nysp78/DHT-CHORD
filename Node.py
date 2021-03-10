@@ -4,6 +4,9 @@ import requests
 import sys
 import time
 from flask.json import JSONEncoder, JSONDecoder
+    
+def hashing(value):
+    return sha1(value.encode()).hexdigest()
 
 class Node(object):
     def __init__(self, ip_addr, port):
@@ -26,6 +29,9 @@ class Node(object):
     
     def get_pred(self):
         return self.predecessor
+
+    def hashing(self,value):
+        return sha1(value.encode()).hexdigest()
 
     #update the successor of the this node
     def update_successor(self, res):
@@ -56,7 +62,7 @@ class Node(object):
             return x !=a and x!=b
 
     @staticmethod
-    def between_right_inclusive(x, a, b):
+    def between_right(x, a, b):
         if a > b:
             return a < x or b >= x
         elif a < b:
@@ -64,47 +70,46 @@ class Node(object):
         else:
             return a !=x
 
-    
+    #successor sets node as its pred
     def notify(self, addr):
-        n_prime = sha1(addr.encode()).hexdigest()
+        addr_id = self.hashing(addr)
         pred = self.get_pred()
-        pred_id = sha1(pred.encode()).hexdigest()
-        if pred == self.host or Node.between(n_prime, pred_id, self.node_id):
+        pred_id = self.hashing(pred)
+        if pred == self.host or Node.between(addr_id, pred_id, self.node_id):
             self.update_predecessor(addr)
             return True
         return False
-
 
     @staticmethod
     def stabilize_node(node):
         succ = node.get_succ()
         pred = node.get_pred()
         print("succ:",succ,  "????", "pred:", pred)
-        if succ != node.host:
+
+        if succ != node.host: #node asks its successor for its predecessor
             url = 'http://{0}/node/get_pred'.format(succ)
-            try:
-                r = requests.get(url)
-                if r.status_code == 200:
+            r = requests.get(url)
+            if r.status_code == 200:
                     x = r.text
-                else:
-                    print('Error getting predecessor for successor: {0}'.format(url))
-                    return
-            except Exception:
+            else:
                 print('Error getting predecessor for successor: {0}'.format(url))
-                return
+
         elif pred != node.host:
             x = pred
         else:
             return
+
         print("PRED HERE:", x)
-        x_id = sha1(x.encode()).hexdigest()
-        succ_id = sha1(succ.encode()).hexdigest()
+        x_id = hashing(x)
+        succ_id = hashing(succ)
+
         if Node.between(x_id, node.node_id, succ_id):
             node.update_successor(x)
-        url = 'http://{0}/node/notify?addr={1}'.format(node.get_succ(), node.host)
+
+        url = 'http://{0}/node/notify?addr={1}'.format(node.get_succ(), node.host) #node notify his successor for being his pred
         r = requests.post(url)
         if r.status_code != 200:
-            print('Error notifying successor: {0}'.format(url))
+            print('Unable to notify successor: {0}'.format(url))
 
 
     
@@ -113,6 +118,8 @@ class Node(object):
             print("PERIODICALLY")
             Node.stabilize_node(self)
             time.sleep(interval)
+
+
 
     
 
