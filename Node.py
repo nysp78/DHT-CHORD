@@ -177,18 +177,8 @@ class Node(object):
         if r.status_code != 200:
             print('Unable to notify successor: {0}'.format(url))
 
-
     
     def stabilize(self, interval):
         while self.stability:
             Node.stabilize_node(self)
-            time.sleep(interval)
-
-
-
-
-
-
-
-
-        
+            time.sleep(interval) 

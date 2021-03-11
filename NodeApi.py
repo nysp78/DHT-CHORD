@@ -235,19 +235,27 @@ def delete(key):
                 return "Key does not exist", 500
 
 
+#return the topology of the chord ring -> a list node
+@app.route("/node/net_overlay/", methods=["GET"])
+def net_overlay():
+    nodes = []
+    nodes.append(current_node.host) #insert the first node
+    succ = current_node.get_succ()
+    nodes.append(succ) #insert succ of current node
+    while succ!=nodes[0]:
+        url = "http://{0}/node/get_succ/".format(succ)
+        reply = requests.get(url)
+        if reply.status_code==200:
+            succ = reply.text
+            nodes.append(reply.text)  
+        else:
+            return "error" , 500
+    
+    return json.dumps(nodes)
+
 
 #Collects all nodes' storages
 def query_all():
     url = "http://{0}/node/collect_total/".format(BOOTSTRAP_ADDR)
     reply = requests.get(url)
     return reply.text
-
-
-
-
-
-    
-
-
-
-

@@ -53,6 +53,3 @@ class Bootstrap(Node):
     
     def get_total_nodes(self):
         return "total nodes in system:" + str(self.number_of_nodes + 1)
-
-    
-
