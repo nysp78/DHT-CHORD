@@ -16,6 +16,11 @@ class Bootstrap(Node):
        self.total_storage = {}
 
 
+    def update_dictionaries(self, key):
+        del self.nodes_dict[key]
+        del self.total_storage[key]
+        self.number_of_nodes -= 1
+
     def collect_total_data(self):
         for address in self.nodes_dict.keys():
             url = "http://{0}/node/get_storage/".format(address)

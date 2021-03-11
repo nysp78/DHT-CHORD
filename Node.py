@@ -4,6 +4,7 @@ import requests
 import sys
 import time
 from flask.json import JSONEncoder, JSONDecoder
+from flask import Flask, redirect, url_for, request, logging, abort, render_template
 import json
     
 def hashing(value):
@@ -21,8 +22,42 @@ class Node(object):
         self.pred_lock = Lock() #lock to write pred
         self.node_storage = {}
         self.stabilizer_thread = Thread(target = self.stabilize, args=(2,)) #periodic operation
+        self.stability = True
         self.stabilizer_thread.start()
        #self.check_predecessor_thread = Thread(target=self.check_predecessor, args=(10,)) #periodic operation
+
+
+    def shutdown(self):
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+        return "ok", 200
+
+
+    #Node leaves the DHT
+    def leave(self):
+        self.doing_stabilize = False
+        succ = self.get_succ()
+        keys = list(self.node_storage.keys())
+        for key in keys:
+            transferred = self.transfer_keys(key, succ) 
+            if not transferred:
+                print("KEYS NOT TRANSFERRED!!!!!!!!!!!!!!!!!!!")
+                return False
+        pred = self.get_pred()
+        url = "http://{0}/node/set_successor/{1}".format(pred, succ)
+        reply = requests.post(url)
+        if reply.status_code != 200:
+            print("2o IF!!!!!!!!!!!!!!")
+            return False
+        url = "http://{0}/node/set_predecessor/{1}".format(succ, pred)
+        reply = requests.post(url)
+        if reply.status_code != 200:
+            print("3o IF!!!!!!!!!!!!!!")
+            return False
+        return True
+
 
 
     def get_succ(self):
@@ -33,6 +68,11 @@ class Node(object):
 
     def get_storage(self):
         return json.dumps(self.node_storage, indent = 4) 
+
+    def set_successor(self, res):
+        self.succ_lock.acquire()
+        self.successor = res
+        self.succ_lock.release()
 
     #update the successor of the this node
     def update_successor(self, res):
@@ -55,17 +95,15 @@ class Node(object):
         self.predecessor = res
         self.pred_lock.release()
 
-    def transfer_keys(self, hash_key, target_addr):
+    def transfer_keys(self, key, target_addr):
         if target_addr == self.host:
             return 1
-        hash_key_tostr = str(hash_key)
-        value = self.node_storage[hash_key_tostr]
-        item = hash_key_tostr , value
-        url = "http://{0}/node/send_item/{1}".format(target_addr, item)
+        key_tostr = str(key)
+        value = self.node_storage[key_tostr]
+        url = "http://{0}/node/send_item/{1}/{2}".format(target_addr, key_tostr, value)
         reply = requests.post(url)
-
         if reply.status_code==200:
-            self.node_storage.pop(hash_key_tostr)
+            del self.node_storage[key_tostr]
             return 1
         
         else:
@@ -142,17 +180,13 @@ class Node(object):
 
     
     def stabilize(self, interval):
-        while 1:
+        while self.stability:
             Node.stabilize_node(self)
             time.sleep(interval)
 
 
 
-    
 
-    
-
-    
 
 
 

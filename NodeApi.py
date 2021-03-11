@@ -51,6 +51,25 @@ def join():
     except:
         raise ConnectionAbortedError
 
+# Gracefully departing node
+@app.route("/node/depart/", methods = ["POST", "PUT"])
+def depart():
+    dep = current_node.leave()
+    if not dep :
+        return "Error while departing", 500
+    url = "http://{0}/node/update_bootstrap/{1}".format(BOOTSTRAP_ADDR, current_node.host)
+    reply = requests.post(url)
+    if reply.status_code != 200 :
+        return "Error updating boot's dict", 500
+    current_node.shutdown()
+    return "Node departed", 200
+
+# Updates Bootstrap's dictionary when a node gracefully departs from DHT Chord
+@app.route("/node/update_bootstrap/<addr>", methods = ["POST", "PUT"])
+def update_bootstrap(addr):
+    current_node.update_dictionaries(addr)
+    return "Bootstrap updated", 200
+
 #bootstrap tells us how many nodes we have in the system
 @app.route("/node/get_total_nodes/", methods=["GET"])
 def return_nodes():
@@ -63,17 +82,29 @@ def send_succ(succ_id):
     current_node.update_successor(succ_id)
     return "ok", 200
 
+#Update successor pointer when a nodes departs gracefully from DHT Chord
+@app.route("/node/set_successor/<succ_id>", methods = ["POST", "PUT"])
+def set_succ(succ_id):
+    current_node.set_successor(succ_id)
+    return "Successor set", 200
 
+#Update predecessor pointer when a nodes departs gracefully from DHT Chord
+@app.route("/node/set_predecessor/<pred_id>", methods = ["POST", "PUT"])
+def set_pred(pred_id):
+    current_node.update_predecessor(pred_id)
+    return "Predecessor set", 200
+
+#Returns successor
 @app.route("/node/get_succ/", methods=["GET"])
 def return_successor():
     return current_node.get_succ()
 
-
+#Returns predecessor
 @app.route("/node/get_pred/", methods=["GET"])
 def return_predecessor():
     return current_node.get_pred()
 
-
+#Notifies the successor about its predecessor (call in Stabilize())
 @app.route('/node/notify', methods=['POST', 'PUT'])
 def notify():
   addr = request.args.get('addr')
@@ -82,7 +113,7 @@ def notify():
     return "predecessor updated", 200
   return "predecessor not updated", 200
 
-
+#Transfer keys from the successor to the node
 @app.route("/node/transfer_keys/<target_node>", methods=["POST, PUT"])
 def transfer_keys(target_node):
     keys = current_node.node_storage.keys() #obtain keys
@@ -91,17 +122,17 @@ def transfer_keys(target_node):
         if not Node.between_right(key_unh, hashing(target_node), current_node.node_id):
             trans_key = current_node.transfer_keys(key_unh, target_node)
             if trans_key:
-                return "key transfered", 200
+                return "Key transferred", 200
             else:
                 return abort(500)
 
-
-@app.route("/node/send_item/<item>", methods=["POST, PUT"])
-def send_item(item):
-    current_node.node_storage[item[0]] = item[1]
+#Update node's storage with key:value
+@app.route("/node/send_item/<key>/<value>", methods=["POST", "PUT"])
+def send_item(key,value):
+    current_node.node_storage[key] = value
     return "key set", 200
 
-
+#Returns successor of the node given a helper node inside the DHT Chord
 @app.route("/node/find_successor/<target_node>", methods=["GET"])
 def find_successor(target_node):
     successor = current_node.get_succ()
@@ -115,7 +146,7 @@ def find_successor(target_node):
        r = requests.get(url)
        return r.text
 
-
+#Inserts pair (key:value) into the DHT Chord
 @app.route("/node/insert_pair/<key>/<value>", methods=["POST", "PUT"])
 def insert_pair(key, value):
     #perform a lookup
@@ -125,6 +156,10 @@ def insert_pair(key, value):
     if successor == current_node.host:
         current_node.node_storage[key] = value
         print("SUCCESS!!!!!!!:", key, value)
+        url = "http://{0}/node/send_node_storage/{1}/{2}".format(BOOTSTRAP_ADDR, current_node.host, current_node.node_storage)
+        reply = requests.post(url)
+        if reply.status_code != 200 :
+            return "Error in sending the mf dictionary", 500
         return "pair inserted to Chord", 200
 
     #else call insert for the successor
@@ -136,7 +171,13 @@ def insert_pair(key, value):
         else:
             return "ERROR with inserting"
 
+#Updates Bootstrap's total storage attribute called in Insert function
+@app.route("/node/send_node_storage/<addr>/<diction>", methods = ["POST", "PUT"])
+def send_node_storage(addr, diction):
+    current_node.total_storage[addr] = diction
+    return "Bootstrap updated [node's] storage", 200
 
+#Returns value based on given key
 @app.route("/node/query_key/<key>", methods=["GET"])
 def query_key(key):
     if key == "*":
@@ -170,13 +211,32 @@ def get_storage():
     return current_node.get_storage()
 
 
-
+#Helper function for query_all()
 @app.route("/node/collect_total/", methods = ["GET"])
 def collect_total():
    return current_node.collect_total_data()
 
+#Delete key:value from DHT Chord
+@app.route("/node/delete/<key>", methods = ["DELETE"])
+def delete(key):
+    if key in current_node.node_storage.keys():
+        current_node.node_storage.pop(key)
+        return "Key deleted", 200
+    else:
+        key_succ = current_node.find_successor(current_node.host, key)
+        if key_succ == current_node.host:
+            return "key Not Found", 500
+        else:
+            url = "http://{0}/node/delete/{1}".format(key_succ, key) 
+            reply = requests.delete(url)
+            if reply.status_code == 200:
+                return "Key deleted", 200
+            else:
+                return "Key does not exist", 500
 
 
+
+#Collects all nodes' storages
 def query_all():
     url = "http://{0}/node/collect_total/".format(BOOTSTRAP_ADDR)
     reply = requests.get(url)
