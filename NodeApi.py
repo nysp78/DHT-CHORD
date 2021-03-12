@@ -9,6 +9,8 @@ from config import *
 
 app = Flask(__name__)
 current_node = None
+#replication = 3
+consistency = "chain"
 
 @app.before_first_request
 def startServer():
@@ -16,6 +18,8 @@ def startServer():
   ip_addr = app.config["IP"] 
   port = app.config["PORT"]
   isboot = app.config["ISBOOT"]
+  #consistency = app.config["CONSISTENCY"]
+  #replication = app.config["REPLICATION"]
   print(ip_addr, port)
   try:
     if isboot == 1:
@@ -126,11 +130,17 @@ def transfer_keys(target_node):
             else:
                 return abort(500)
 
-#Update node's storage with key:value
 @app.route("/node/send_item/<key>/<value>", methods=["POST", "PUT"])
 def send_item(key,value):
     current_node.node_storage[key] = value
     return "key set", 200
+
+#Update node's storage with key:value:replica
+@app.route("/node/send_repl_item/<key>/<value>", methods=["POST", "PUT"])
+def send_repl_item(key,value):
+        repl = current_node.node_storage[key].split(":")[1]
+        current_node.node_storage[key] = value.split(":")[0] + ":" + repl
+        return "key set", 200
 
 #Returns successor of the node given a helper node inside the DHT Chord
 @app.route("/node/find_successor/<target_node>", methods=["GET"])
@@ -147,29 +157,69 @@ def find_successor(target_node):
        return r.text
 
 #Inserts pair (key:value) into the DHT Chord
-@app.route("/node/insert_pair/<key>/<value>", methods=["POST", "PUT"])
-def insert_pair(key, value):
-    #perform a lookup
-    successor = current_node.find_successor(current_node.host, key)
+@app.route("/node/insert_pair/<key>/<value>/<replicas>", methods=["POST", "PUT"])
+def insert_pair(key, value, replicas):
+    
+    if consistency == "chain" :
 
-    #if current node is equal to key succ
-    if successor == current_node.host:
-        current_node.node_storage[key] = value
-        print("SUCCESS!!!!!!!:", key, value)
+        #perform a lookup
+        successor = current_node.find_successor(current_node.host, key)
+
+        #if current node is equal to key succ
+        if successor == current_node.host:
+            current_node.node_storage[key] = value + ":" + replicas
+            print("SUCCESS!!!!!!!:", key, value)
+            url = "http://{0}/node/send_node_storage/{1}/{2}".format(BOOTSTRAP_ADDR, current_node.host, current_node.node_storage)
+            reply = requests.post(url)
+            print("BOOTSTRAPS REPLY1", reply.status_code)
+            if reply.status_code != 200 :
+                return "Error in sending the dictionary", 500
+            if int(replicas) == 1:
+                return "Replicas inserted to Chord", 200
+            elif int(replicas) > 1:
+                print("replicas!!!!! ", replicas ) 
+                succ = current_node.get_succ()
+                url = "http://{0}/node/store_replicas/{1}/{2}/{3}".format(succ, key, value, replicas)
+                reply = requests.post(url)
+                print("REPLY!!!!!!!!!!!!!!!!!!!", reply.status_code, reply.text)
+                if reply.status_code != 200 :
+                   return "Error while inserting replicas", 500
+                return reply.text, 200
+                
+
+        #else call insert for the successor
+        else:
+            url = "http://{0}/node/insert_pair/{1}/{2}/{3}".format(successor, key, value, replicas)
+            res = requests.post(url)
+            print("RESS!!!!!!!!!!!!!!!!!!!", res.status_code, res.text)
+            if res.status_code == 200:
+                return "Replicas inserted to Chord", 200
+            else:
+                return "ERROR with inserting", 500
+    else:
+        pass 
+
+@app.route("/node/store_replicas/<key>/<value>/<replicas>", methods = ["POST", "PUT"])
+def store_replicas(key, value, replicas):
+    replicas = int(replicas)
+    print("KLITHIKA!!!!!")
+    print("replicas!!!!!!!!!!!! ", replicas)
+    replicas-=1
+    if int(replicas) > 0 :
+        current_node.node_storage[key] = value + ":" + str(replicas)
         url = "http://{0}/node/send_node_storage/{1}/{2}".format(BOOTSTRAP_ADDR, current_node.host, current_node.node_storage)
         reply = requests.post(url)
+        print("BOOTSTRAPS REPLY2", reply.text)
         if reply.status_code != 200 :
-            return "Error in sending the mf dictionary", 500
-        return "pair inserted to Chord", 200
+            return "Error in sending the dictionary", 500
+        succ = current_node.get_succ()
+        if int(replicas) > 1:
+            url = "http://{0}/node/store_replicas/{1}/{2}/{3}".format(succ, key, value, replicas)
+            reply = requests.post(url)
+            print("REPLICATION > 1!!!!", reply.text)
+    return "Replicas inserted to chord", 200
 
-    #else call insert for the successor
-    else:
-        url = "http://{0}/node/insert_pair/{1}/{2}".format(successor, key, value)
-        res = requests.post(url)
-        if res.status_code == 200:
-            return "pair inserted to Chord", 200
-        else:
-            return "ERROR with inserting"
+    
 
 #Updates Bootstrap's total storage attribute called in Insert function
 @app.route("/node/send_node_storage/<addr>/<diction>", methods = ["POST", "PUT"])
@@ -180,30 +230,41 @@ def send_node_storage(addr, diction):
 #Returns value based on given key
 @app.route("/node/query_key/<key>", methods=["GET"])
 def query_key(key):
-    if key == "*":
-        return query_all()
-    
-    else:
-        if key in current_node.node_storage.keys():
-            value = current_node.node_storage[key]
-            return value, 200
-
-        else:
-            key_succ = current_node.find_successor(current_node.host, key)
-            if key_succ == current_node.host:
-                return "key Not Found", 500
+    if consistency == "chain":
+        if key == "*":
+            return query_all()
         
-            else:
-            #      print("SUCCC:",key_succ, current_node.host)
-                url = "http://{0}/node/query_key/{1}".format(key_succ, key)
-                reply = requests.get(url)
+        else:
+            if key in current_node.node_storage.keys():
+                value = current_node.node_storage[key]
+                if int(value[1]) == 1:
+                    return json.dumps(value), 200
 
-                if reply.status_code == 200:
-                    return reply.text, 200
+                else:
+                    succ = current_node.get_succ()
+                    url = "http://{0}/node/query_key/{1}".format(succ, key)
+                    reply = requests.get(url)
+                    return reply.text,200
+
+
+            else:
+                key_succ = current_node.find_successor(current_node.host, key)
+                if key_succ == current_node.host:
+                    return "key Not Found", 500
             
                 else:
-                    return "Key not found" , 500
-    
+                #      print("SUCCC:",key_succ, current_node.host)
+                    url = "http://{0}/node/query_key/{1}".format(key_succ, key)
+                    reply = requests.get(url)
+
+                    if reply.status_code == 200:
+                        return reply.text, 200
+                
+                    else:
+                        return "Key not found" , 500
+    else:
+        pass
+
 
 #return the node storage 
 @app.route("/node/get_storage/", methods=["GET"])
@@ -219,20 +280,36 @@ def collect_total():
 #Delete key:value from DHT Chord
 @app.route("/node/delete/<key>", methods = ["DELETE"])
 def delete(key):
-    if key in current_node.node_storage.keys():
-        current_node.node_storage.pop(key)
-        return "Key deleted", 200
-    else:
-        key_succ = current_node.find_successor(current_node.host, key)
-        if key_succ == current_node.host:
-            return "key Not Found", 500
-        else:
-            url = "http://{0}/node/delete/{1}".format(key_succ, key) 
+
+    succ = current_node.find_successor(current_node.host, key)
+    url = "http://{0}/node/delete_replicas/{1}".format(succ, key)
+    reply = requests.delete(url)
+    if reply.status_code == 200:
+        return "Key deleted succesfully"
+    else :
+        return "SHIT", 500
+
+
+@app.route("/node/delete_replicas/<key>", methods = ["DELETE"])
+def delete_replicas(key):
+    replica = current_node.node_storage[key].split(":")[1]
+    replicas = int(replica)
+    if replicas > 0 :
+        current_node.node_storage.pop(key) 
+        url = "http://{0}/node/send_node_storage/{1}/{2}".format(BOOTSTRAP_ADDR, current_node.host, current_node.node_storage)
+        reply = requests.post(url)
+        #print("BOOTSTRAPS REPLY2", reply.text)
+        if reply.status_code != 200 :
+            return "Error in sending the dictionary", 500
+        succ = current_node.get_succ()
+        if int(replicas) > 1:
+            url = "http://{0}/node/delete_replicas/{1}".format(succ, key)
             reply = requests.delete(url)
-            if reply.status_code == 200:
-                return "Key deleted", 200
-            else:
-                return "Key does not exist", 500
+            #print("REPLICATION > 1!!!!", reply.text)
+    return "Replicas deleted from chord", 200
+
+
+
 
 
 #return the topology of the chord ring -> a list node

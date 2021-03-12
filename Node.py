@@ -39,7 +39,7 @@ class Node(object):
     def leave(self):
         self.doing_stabilize = False
         succ = self.get_succ()
-        keys = list(self.node_storage.keys())
+        keys = list(self.node_storage.keys())        
         for key in keys:
             transferred = self.transfer_keys(key, succ) 
             if not transferred:
@@ -98,16 +98,29 @@ class Node(object):
     def transfer_keys(self, key, target_addr):
         if target_addr == self.host:
             return 1
-        key_tostr = str(key)
-        value = self.node_storage[key_tostr]
-        url = "http://{0}/node/send_item/{1}/{2}".format(target_addr, key_tostr, value)
-        reply = requests.post(url)
-        if reply.status_code==200:
-            del self.node_storage[key_tostr]
-            return 1
-        
+        value = self.node_storage[str(key)]
+        print("VALUE =", value)
+        replicas = value.split(":")[1]
+        if replicas == "1":
+            print("MPIKA STIN SEND ITEM!!!!!!!!!!!!!!!")
+            url = "http://{0}/node/send_item/{1}/{2}".format(target_addr, key, value)
+            reply = requests.post(url)
+            if reply.status_code==200:
+                del self.node_storage[key]
+                return 1
+            else:
+               return 0
         else:
-            return 0
+            
+            print("MPIKA STIN SEND REPL ITEM!!!!!!!!!!!!!!!")
+            url = "http://{0}/node/send_repl_item/{1}/{2}".format(target_addr, key, value)
+            reply = requests.post(url)
+            if reply.status_code==200:
+                del self.node_storage[key]
+                return 1
+        
+            else:
+                return 0
 
     @staticmethod
     def between(x, a, b):
