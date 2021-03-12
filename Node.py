@@ -211,6 +211,7 @@ class Node(object):
     def check_predecessor(self, interval):
         while self.stability:
             pred = self.get_pred()
+            print("[EXECUTING CHECK PREDECESSOR] PREDECESSOR OF {} IS {}".format(self.host, pred))
             if pred != self.host:
                 url = "http://{0}/".format(pred)
                 try:
@@ -219,4 +220,4 @@ class Node(object):
                         self.update_predecessor(self.host)
                 except Exception:
                     self.update_predecessor(self.host)  
-        time.sleep(interval)
+            time.sleep(interval)
