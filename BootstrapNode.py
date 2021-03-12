@@ -16,10 +16,15 @@ class Bootstrap(Node):
        self.total_storage = {}
 
 
-    def update_dictionaries(self, key):
-        del self.nodes_dict[key]
-        del self.total_storage[key]
-        self.number_of_nodes -= 1
+    def update_dictionaries(self, addr_key):
+        print("NODE DICT, ADDR", self.nodes_dict[addr_key], addr_key)
+        try:
+            del self.nodes_dict[addr_key]
+            del self.total_storage[addr_key]
+            self.number_of_nodes -= 1
+        
+        except:
+            return "Error of deleting from bootstrap"
 
     def collect_total_data(self):
         for address in self.nodes_dict.keys():

@@ -23,8 +23,10 @@ class Node(object):
         self.node_storage = {}
         self.stabilizer_thread = Thread(target = self.stabilize, args=(2,)) #periodic operation
         self.stability = True
+        self.check_predecessor_thread = Thread(target=self.check_predecessor, args=(10,)) #periodic operation
         self.stabilizer_thread.start()
-       #self.check_predecessor_thread = Thread(target=self.check_predecessor, args=(10,)) #periodic operation
+        self.check_predecessor_thread.start()
+
 
 
     def shutdown(self):
@@ -37,7 +39,7 @@ class Node(object):
 
     #Node leaves the DHT
     def leave(self):
-        self.doing_stabilize = False
+        self.stability = False
         succ = self.get_succ()
         keys = list(self.node_storage.keys())        
         for key in keys:
@@ -46,18 +48,22 @@ class Node(object):
                 print("KEYS NOT TRANSFERRED!!!!!!!!!!!!!!!!!!!")
                 return False
         pred = self.get_pred()
-        url = "http://{0}/node/set_successor/{1}".format(pred, succ)
-        reply = requests.post(url)
-        if reply.status_code != 200:
-            print("2o IF!!!!!!!!!!!!!!")
-            return False
-        url = "http://{0}/node/set_predecessor/{1}".format(succ, pred)
-        reply = requests.post(url)
-        if reply.status_code != 200:
-            print("3o IF!!!!!!!!!!!!!!")
-            return False
-        return True
+        try:
+            url = "http://{0}/node/set_successor/{1}".format(pred, succ) 
+            reply = requests.post(url)
+            if reply.status_code != 200:
+                print("2o IF!!!!!!!!!!!!!!")
+                return False
+            url = "http://{0}/node/set_predecessor/{1}".format(succ, pred)
+            reply = requests.post(url)
+            if reply.status_code != 200:
+                print("3o IF!!!!!!!!!!!!!!")
+                return False
 
+        except Exception:
+            return "PIPIS"
+        
+        return True
 
 
     def get_succ(self):
@@ -94,6 +100,7 @@ class Node(object):
         self.pred_lock.acquire()
         self.predecessor = res
         self.pred_lock.release()
+
 
     def transfer_keys(self, key, target_addr):
         if target_addr == self.host:
@@ -157,7 +164,7 @@ class Node(object):
             if request.status_code == 200:
                 return request.text #5000
         except:
-            raise ConnectionError
+            return "SKATA"
 
 
     @staticmethod
@@ -166,13 +173,17 @@ class Node(object):
         pred = node.get_pred()
 
         if succ != node.host: #node asks its successor for its predecessor
-            url = 'http://{0}/node/get_pred'.format(succ)
-            r = requests.get(url)
-            if r.status_code == 200:
-                    x = r.text
-            else:
-                print('Error getting predecessor for successor: {0}'.format(url))
-
+            try:
+                url = 'http://{0}/node/get_pred'.format(succ)
+                r = requests.get(url)
+                if r.status_code == 200:
+                        x = r.text
+                else:
+                    print('Error getting predecessor for successor: {0}'.format(url))
+                    return 
+            except:
+                return "Pred not updating!"
+                
         elif pred != node.host:
             x = pred
         else:
@@ -195,3 +206,17 @@ class Node(object):
         while self.stability:
             Node.stabilize_node(self)
             time.sleep(interval) 
+
+
+    def check_predecessor(self, interval):
+        while self.stability:
+            pred = self.get_pred()
+            if pred != self.host:
+                url = "http://{0}/".format(pred)
+                try:
+                    r = requests.get(url)
+                    if r.status_code != 200:
+                        self.update_predecessor(self.host)
+                except Exception:
+                    self.update_predecessor(self.host)  
+        time.sleep(interval)

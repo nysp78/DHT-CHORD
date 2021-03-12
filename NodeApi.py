@@ -45,12 +45,12 @@ def check_server():
 @app.route('/node/join/', methods=['POST', 'PUT'])
 def join():
     addrs = ["127.0.0.1:5001", "127.0.0.1:5002", "127.0.0.1:5003", "127.0.0.1:5004", "127.0.0.1:5005", "127.0.0.1:5006",
-    "127.0.0.1:5007", "127.0.0.1:5008", "127.0.0.1:5009"]
+    "127.0.0.1:5007", "127.0.0.1:5008", "127.0.0.1:5000"]
 
     try:
         for addr in addrs:
             current_node.join(addr)
-        return "ok", 200
+        return "ok\n", 200
 
     except:
         raise ConnectionAbortedError
@@ -64,9 +64,9 @@ def depart():
     url = "http://{0}/node/update_bootstrap/{1}".format(BOOTSTRAP_ADDR, current_node.host)
     reply = requests.post(url)
     if reply.status_code != 200 :
-        return "Error updating boot's dict", 500
+        return "Error updating boot's dict\n", 500
     current_node.shutdown()
-    return "Node departed", 200
+    return "Node departed\n", 200
 
 # Updates Bootstrap's dictionary when a node gracefully departs from DHT Chord
 @app.route("/node/update_bootstrap/<addr>", methods = ["POST", "PUT"])
@@ -161,7 +161,6 @@ def find_successor(target_node):
 def insert_pair(key, value, replicas):
     
     if consistency == "chain" :
-
         #perform a lookup
         successor = current_node.find_successor(current_node.host, key)
 
@@ -173,9 +172,9 @@ def insert_pair(key, value, replicas):
             reply = requests.post(url)
             print("BOOTSTRAPS REPLY1", reply.status_code)
             if reply.status_code != 200 :
-                return "Error in sending the dictionary", 500
+                return "Error in sending the dictionary\n", 500
             if int(replicas) == 1:
-                return "Replicas inserted to Chord", 200
+                return "Replicas inserted to Chord\n", 200
             elif int(replicas) > 1:
                 print("replicas!!!!! ", replicas ) 
                 succ = current_node.get_succ()
@@ -183,7 +182,7 @@ def insert_pair(key, value, replicas):
                 reply = requests.post(url)
                 print("REPLY!!!!!!!!!!!!!!!!!!!", reply.status_code, reply.text)
                 if reply.status_code != 200 :
-                   return "Error while inserting replicas", 500
+                   return "Error while inserting replicas\n", 500
                 return reply.text, 200
                 
 
@@ -193,7 +192,7 @@ def insert_pair(key, value, replicas):
             res = requests.post(url)
             print("RESS!!!!!!!!!!!!!!!!!!!", res.status_code, res.text)
             if res.status_code == 200:
-                return "Replicas inserted to Chord", 200
+                return "Replicas inserted to Chord\n", 200
             else:
                 return "ERROR with inserting", 500
     else:
@@ -211,13 +210,13 @@ def store_replicas(key, value, replicas):
         reply = requests.post(url)
         print("BOOTSTRAPS REPLY2", reply.text)
         if reply.status_code != 200 :
-            return "Error in sending the dictionary", 500
+            return "Error in sending the dictionary\n", 500
         succ = current_node.get_succ()
         if int(replicas) > 1:
             url = "http://{0}/node/store_replicas/{1}/{2}/{3}".format(succ, key, value, replicas)
             reply = requests.post(url)
             print("REPLICATION > 1!!!!", reply.text)
-    return "Replicas inserted to chord", 200
+    return "Replicas inserted to chord\n", 200
 
     
 
@@ -250,7 +249,7 @@ def query_key(key):
             else:
                 key_succ = current_node.find_successor(current_node.host, key)
                 if key_succ == current_node.host:
-                    return "key Not Found", 500
+                    return "key Not Found\n", 500
             
                 else:
                 #      print("SUCCC:",key_succ, current_node.host)
@@ -261,7 +260,7 @@ def query_key(key):
                         return reply.text, 200
                 
                     else:
-                        return "Key not found" , 500
+                        return "Key not found\n" , 500
     else:
         pass
 
@@ -270,6 +269,10 @@ def query_key(key):
 @app.route("/node/get_storage/", methods=["GET"])
 def get_storage():
     return current_node.get_storage()
+
+@app.route("/node/get_boot_dict/", methods=["GET"])
+def get_boot_dict():
+    return json.dumps(current_node.nodes_dict)
 
 
 #Helper function for query_all()
@@ -285,9 +288,9 @@ def delete(key):
     url = "http://{0}/node/delete_replicas/{1}".format(succ, key)
     reply = requests.delete(url)
     if reply.status_code == 200:
-        return "Key deleted succesfully"
+        return "Key deleted succesfully\n"
     else :
-        return "SHIT", 500
+        return "ERROR with key deletion", 500
 
 
 @app.route("/node/delete_replicas/<key>", methods = ["DELETE"])
@@ -300,13 +303,13 @@ def delete_replicas(key):
         reply = requests.post(url)
         #print("BOOTSTRAPS REPLY2", reply.text)
         if reply.status_code != 200 :
-            return "Error in sending the dictionary", 500
+            return "Error in sending the dictionary\n", 500
         succ = current_node.get_succ()
         if int(replicas) > 1:
             url = "http://{0}/node/delete_replicas/{1}".format(succ, key)
             reply = requests.delete(url)
             #print("REPLICATION > 1!!!!", reply.text)
-    return "Replicas deleted from chord", 200
+    return "Replicas deleted from chord\n", 200
 
 
 
