@@ -5,7 +5,7 @@ import json
 import socket
 
 
-ip = socket.gethostbyname(socket.gethostname() + ".local")
+ip = socket.gethostbyname(socket.gethostname() +".local")
 
 
 @click.group()
@@ -24,6 +24,19 @@ def insert(key, value, port):
         click.echo("Pair inserted successfully")
     else:
         click.echo("Fail to insert the pair!") 
+
+
+
+@main.command()
+def join():
+    "Nodes inserted to Chord"
+    requested_url = "http://{0}:5000/node/join/".format(ip)
+    reply = requests.post(requested_url)
+
+    if reply.status_code == 200:
+        click.echo("Nodes inserted successfully")
+    else:
+        click.echo("Fail to insert the Nodes!") 
 
 
 @main.command()

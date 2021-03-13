@@ -11,5 +11,5 @@ for i in range(5001,5010):
     os.system("gnome-terminal -e 'bash -c \""+ command +";bash\"'")
 
 #9 nodes join the ring
-command_join = "curl --location --request PUT '192.168.1.7:5000/node/join'"
-os.system("gnome-terminal -e 'bash -c \""+ command_join +";bash\"'")
+#command_join = "curl --location --request PUT '192.168.1.7:5000/node/join'"
+#os.system("gnome-terminal -e 'bash -c \""+ command_join +";bash\"'")
