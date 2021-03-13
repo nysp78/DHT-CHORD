@@ -48,8 +48,9 @@ def check_server():
 # add a node in the chord ring
 @app.route('/node/join/', methods=['POST', 'PUT'])
 def join():
-    addrs = ["127.0.0.1:5001", "127.0.0.1:5002", "127.0.0.1:5003", "127.0.0.1:5004", "127.0.0.1:5005", "127.0.0.1:5006",
-             "127.0.0.1:5007", "127.0.0.1:5008", "127.0.0.1:5009"]
+    
+    #a list of nodes that are inserted in chord
+    addrs = [NODE_ADDR1, NODE_ADDR2, NODE_ADDR3, NODE_ADDR4, NODE_ADDR5, NODE_ADDR6, NODE_ADDR7, NODE_ADDR8, NODE_ADDR9]
 
     try:
         for addr in addrs:
