@@ -45,5 +45,52 @@ def query(key, port):
 
 
 
+@main.command()
+@click.option("--key")
+@click.option("--port")
+def delete(key, port):
+    "delete key from Chord"
+    requested_url = "http://{0}:{1}/node/delete/{2}".format(ip, port, key)
+    reply = requests.delete(requested_url)
+
+    if reply.status_code==200:
+        click.echo("Key deleted successfully from Chord")
+    else:
+        click.echo("Fail to fail to delete key!")
+
+
+@main.command()
+@click.option("--port")
+def depart(port):
+    "Node depart gracefully from Chord"
+    requested_url = "http://{0}:{1}/node/depart/".format(ip, port)
+    reply = requests.post(requested_url)
+
+    if reply.status_code==200:
+        click.echo("Node departed gracefully from Chord")
+    else:
+        click.echo("Failure in node departure!")
+
+
+@main.command()
+@click.option("--port")
+def overlay(port):
+    "Prints the network topology"
+    requested_url = "http://{0}:{1}/node/net_overlay".format(ip, port)
+    reply = requests.get(requested_url)
+
+    if reply.status_code==200:
+        print("Network Topology")
+        ls = reply.text.split(", ")
+        ls[0] = ls[0].replace("[",'')
+        ls[len(ls)-1] = ls[len(ls)-1].replace("]",'')
+        for item in ls:
+            print(item)
+           
+    else:
+        print("Error")
+
+
+
 if __name__ == "__main__":
     main()
