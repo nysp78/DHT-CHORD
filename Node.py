@@ -6,6 +6,9 @@ import time
 from flask.json import JSONEncoder, JSONDecoder
 from flask import Flask, redirect, url_for, request, logging, abort, render_template
 import json
+
+consistency = "eventual"
+#consistency = "chain"
     
 def hashing(value):
     return sha1(value.encode()).hexdigest()
@@ -103,29 +106,40 @@ class Node(object):
 
 
     def transfer_keys(self, key, target_addr):
-        if target_addr == self.host:
-            return 1
-        value = self.node_storage[str(key)]
-        print("VALUE =", value)
-        replicas = value.split(":")[1]
-        if replicas == "1":
-            print("MPIKA STIN SEND ITEM!!!!!!!!!!!!!!!")
-            url = "http://{0}/node/send_item/{1}/{2}".format(target_addr, key, value)
-            reply = requests.post(url)
-            if reply.status_code==200:
-                del self.node_storage[key]
+        if consistency == "chain":
+            if target_addr == self.host:
                 return 1
+            value = self.node_storage[str(key)]
+            replicas = value.split(":")[1]
+            if replicas == "1":
+                url = "http://{0}/node/send_item/{1}/{2}".format(target_addr, key, value)
+                reply = requests.post(url)
+                if reply.status_code==200:
+                    del self.node_storage[key]
+                    return 1
+                else:
+                    return 0
             else:
-               return 0
-        else:
-            
-            print("MPIKA STIN SEND REPL ITEM!!!!!!!!!!!!!!!")
-            url = "http://{0}/node/send_repl_item/{1}/{2}".format(target_addr, key, value)
+                
+                url = "http://{0}/node/send_repl_item/{1}/{2}".format(target_addr, key, value)
+                reply = requests.post(url)
+                if reply.status_code==200:
+                    del self.node_storage[key]
+                    return 1
+                else:
+                    return 0
+                    
+        elif consistency == "eventual":
+            if target_addr == self.host:
+                return 1
+            value = self.node_storage[str(key)]
+            #replicas = value.split(":")[1]
+            url = "http://{0}/node/eventually_transfer/{1}/{2}".format(target_addr, key, value)
             reply = requests.post(url)
             if reply.status_code==200:
                 del self.node_storage[key]
                 return 1
-        
+            
             else:
                 return 0
 
