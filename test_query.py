@@ -13,21 +13,20 @@ node_list = ["127.0.0.1:5000", "127.0.0.1:5001", "127.0.0.1:5002", "127.0.0.1:50
 each of them to a random server"""
 
 start = time.time()
-insert_count = 0
-with open("insert.txt", 'r') as f:
+query_count = 0
+with open("query.txt", 'r') as f:
     for file_line in f:
         line = file_line.rstrip()
-        commasplit = file_line.split(", ")
-        no_questionmark_commasplit = commasplit[0].replace("?", "")
-        no_whitespace_commasplit = no_questionmark_commasplit.replace(" ", "%20")
+        line = line.replace("?", "")
+        line = line.replace(" ", "%20")
         chosen_node = np.random.choice(node_list)
-        url = "http://{0}/node/insert_pair/{1}/{2}/{3}".format(chosen_node, no_whitespace_commasplit, commasplit[1], REPLICATION)
+        url = "http://{0}/node/query_key/{1}".format(chosen_node, line)
         try:
-            reply = requests.post(url)
+            reply = requests.get(url)
             if reply.status_code != 200:
                 break
-            insert_count += 1
-            print("COUNT = ", insert_count)
+            query_count += 1
         except:
+            print("An error occured")
             break
-print ((time.time() - start) / insert_count)
+print ((time.time() - start) / query_count)

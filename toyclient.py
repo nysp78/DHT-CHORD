@@ -5,12 +5,15 @@ import json
 import socket
 
 
-ip = socket.gethostbyname(socket.gethostname() +".local")
+#ip = socket.gethostbyname(socket.gethostname() +".local")
+ip = "127.0.0.1"
 
 
 @click.group()
 def main():
      "A ToyChord Client Command Line Interface"
+    
+
 
 @main.command()
 @click.option("--key")
@@ -80,7 +83,8 @@ def depart(port):
     reply = requests.post(requested_url)
 
     if reply.status_code==200:
-        click.echo("Node departed gracefully from Chord")
+        click.echo(click.style("Node departed gracefully from Chord", fg='green'))
+
     else:
         click.echo("Failure in node departure!")
 
@@ -107,3 +111,7 @@ def overlay(port):
 
 if __name__ == "__main__":
     main()
+
+click.echo(click.style('Hello World!', fg='green'))
+click.echo(click.style('Some more text', bg='blue', fg='white'))
+click.echo(click.style('ATTENTION', blink=True, bold=True))

@@ -322,7 +322,7 @@ def query_key(key):
             if key in current_node.node_storage.keys():
                 value = current_node.node_storage[key]
 
-                if int(value[1]) == 1:
+                if int(value.split(":")[1]) == 1:
                     return json.dumps(value), 200
 
                 else:
