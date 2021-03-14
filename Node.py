@@ -6,9 +6,8 @@ import time
 from flask.json import JSONEncoder, JSONDecoder
 from flask import Flask, redirect, url_for, request, logging, abort, render_template
 import json
+from config import *
 
-consistency = "eventual"
-#consistency = "chain"
     
 def hashing(value):
     return sha1(value.encode()).hexdigest()
@@ -31,7 +30,7 @@ class Node(object):
         self.check_predecessor_thread.start()
 
 
-
+    #shutdown the Werkzeug Server
     def shutdown(self):
         func = request.environ.get('werkzeug.server.shutdown')
         if func is None:
@@ -55,12 +54,11 @@ class Node(object):
             url = "http://{0}/node/set_successor/{1}".format(pred, succ) 
             reply = requests.post(url)
             if reply.status_code != 200:
-                print("2o IF!!!!!!!!!!!!!!")
                 return False
+            
             url = "http://{0}/node/set_predecessor/{1}".format(succ, pred)
             reply = requests.post(url)
             if reply.status_code != 200:
-                print("3o IF!!!!!!!!!!!!!!")
                 return False
 
         except Exception:
@@ -105,8 +103,11 @@ class Node(object):
         self.pred_lock.release()
 
 
+    #function that transfer keys between nodes: departing and join nodes in the ring
+    # chain replication -> not preserve the number of replicas 
+    # eventual consistency -> preserve the number of replicas 
     def transfer_keys(self, key, target_addr):
-        if consistency == "chain":
+        if CONSISTENCY == "chain":
             if target_addr == self.host:
                 return 1
             value = self.node_storage[str(key)]
@@ -119,8 +120,7 @@ class Node(object):
                     return 1
                 else:
                     return 0
-            else:
-                
+            else: 
                 url = "http://{0}/node/send_repl_item/{1}/{2}".format(target_addr, key, value)
                 reply = requests.post(url)
                 if reply.status_code==200:
@@ -129,11 +129,10 @@ class Node(object):
                 else:
                     return 0
                     
-        elif consistency == "eventual":
+        elif CONSISTENCY == "eventual":
             if target_addr == self.host:
                 return 1
             value = self.node_storage[str(key)]
-            #replicas = value.split(":")[1]
             url = "http://{0}/node/eventually_transfer/{1}/{2}".format(target_addr, key, value)
             reply = requests.post(url)
             if reply.status_code==200:
@@ -143,25 +142,25 @@ class Node(object):
             else:
                 return 0
 
+#determine the position of node/key in the ring
     @staticmethod
     def between(x, a, b):
-        if a > b:
-            return a < x or x < b
-        elif a < b:
-            return a < x and x < b
-        else:
-            return x !=a and x!=b
+        if a > b: return a < x or x < b
+        
+        elif a < b: return a < x and x < b
+        
+        else: return x !=a and x!=b
 
     @staticmethod
     def between_right(x, a, b):
-        if a > b:
-            return a < x or b >= x
-        elif a < b:
-            return a < x and b >= x
-        else:
-            return a !=x
+        if a > b: return a < x or b >= x
+        
+        elif a < b: return a < x and b >= x
+        
+        else: return a !=x
 
-    #successor sets node as its pred
+
+    #successor sets node as its pred: notifies the successor for its predecessor
     def notify(self, addr):
         addr_id = hashing(addr)
         pred = self.get_pred()
@@ -171,6 +170,7 @@ class Node(object):
             return True
         return False
 
+    #given a known node in the ring as help node, we find the successor of the target node
     def find_successor(self, help_node, target_node):
         try:
             url = "http://{0}/node/find_successor/{1}".format(help_node, target_node)
@@ -180,13 +180,13 @@ class Node(object):
         except:
             return "SKATA"
 
-
+    #this method is running a thread periodically and fixes the predecessor
     @staticmethod
     def stabilize_node(node):
         succ = node.get_succ()
         pred = node.get_pred()
 
-        if succ != node.host: #node asks its successor for its predecessor
+        if succ != node.host: #node asks its successor for its predecessor 
             try:
                 url = 'http://{0}/node/get_pred'.format(succ)
                 r = requests.get(url)
@@ -222,10 +222,10 @@ class Node(object):
             time.sleep(interval) 
 
 
+    #threads that runs periodically and checks if the predecessor is alive 
     def check_predecessor(self, interval):
         while self.stability:
             pred = self.get_pred()
-            print("[EXECUTING CHECK PREDECESSOR] PREDECESSOR OF {} IS {}".format(self.host, pred))
             if pred != self.host:
                 url = "http://{0}/".format(pred)
                 try:

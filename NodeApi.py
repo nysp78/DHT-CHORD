@@ -11,9 +11,6 @@ from config import *
 
 app = Flask(__name__)
 current_node = None
-#replication = 3
-#consistency = "eventual"
-#consistency = "chain"
 
 #Starting DHT server
 @app.before_first_request
@@ -22,8 +19,6 @@ def startServer():
     ip_addr = app.config["IP"]
     port = app.config["PORT"]
     isboot = app.config["ISBOOT"]
-    #consistency = app.config["CONSISTENCY"]
-    #replication = app.config["REPLICATION"]
     print(ip_addr, port)
     try:
         if isboot == 1:
@@ -50,7 +45,8 @@ def check_server():
 def join():
     
     #a list of nodes that are inserted in chord
-    addrs = [NODE_ADDR1, NODE_ADDR2, NODE_ADDR3, NODE_ADDR4, NODE_ADDR5, NODE_ADDR6, NODE_ADDR7, NODE_ADDR8, NODE_ADDR9]
+    addrs = [NODE_ADDR1, NODE_ADDR2, NODE_ADDR3, NODE_ADDR4, 
+                                    NODE_ADDR5, NODE_ADDR6, NODE_ADDR7, NODE_ADDR8, NODE_ADDR9]
 
     try:
         for addr in addrs:
@@ -259,7 +255,7 @@ def insert_pair(key, value, replicas):
             else :
                 succ = current_node.get_succ()
                 replicaThread = Thread(target = eventual_threading_replicas_storing, args=(key, value, replicas, succ))
-                time.sleep(3)
+                #time.sleep(3)
                 replicaThread.start()
                 return "Primary replica inserted to Chord\n", 200
 
@@ -275,6 +271,7 @@ def insert_pair(key, value, replicas):
 
 #Stores to k-1 nodes the key:value:replicas tuples with the help of thread
 def eventual_threading_replicas_storing(key, value, replicas, succ_addr):
+    time.sleep(3)
     url = "http://{0}/node/store_replicas/{1}/{2}/{3}".format(succ_addr, key, value, replicas)
     reply = requests.post(url)
     if reply.status_code != 200:
@@ -292,7 +289,6 @@ def store_replicas(key, value, replicas):
         url = "http://{0}/node/send_node_storage/{1}/{2}".format(
             BOOTSTRAP_ADDR, current_node.host, current_node.node_storage)
         reply = requests.post(url)
-        print("BOOTSTRAPS REPLY2", reply.text)
         if reply.status_code != 200:
             return "Error in sending the dictionary\n", 500
         succ = current_node.get_succ()
@@ -334,7 +330,7 @@ def query_key(key):
             else:
                 key_succ = current_node.find_successor(current_node.host, key)
                 if key_succ == current_node.host:
-                    return "key Not Found\n", 500
+                    return "key Not Found\n", 200
 
                 else:
                     #      print("SUCCC:",key_succ, current_node.host)
@@ -345,7 +341,7 @@ def query_key(key):
                         return reply.text, 200
 
                     else:
-                        return "Key not found\n", 500
+                        return "Key not found\n", 200
 
         elif CONSISTENCY == "eventual":
             if key in current_node.node_storage.keys():
@@ -354,7 +350,7 @@ def query_key(key):
             else:
                 key_succ = current_node.find_successor(current_node.host, key)
                 if key_succ == current_node.host:
-                    return "key Not Found\n", 500
+                    return "key Not Found\n", 200
 
                 else:
                     #      print("SUCCC:",key_succ, current_node.host)
@@ -365,7 +361,7 @@ def query_key(key):
                         return reply.text, 200
 
                     else:
-                        return "Key not found\n", 500
+                        return "Key not found\n", 200
 
 
 # return the node storage
