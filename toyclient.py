@@ -5,8 +5,8 @@ import json
 import socket
 
 
-#ip = socket.gethostbyname(socket.gethostname() +".local")
-ip = "127.0.0.1"
+ip = socket.gethostbyname(socket.gethostname())
+
 
 
 @click.group()
@@ -112,6 +112,3 @@ def overlay(port):
 if __name__ == "__main__":
     main()
 
-click.echo(click.style('Hello World!', fg='green'))
-click.echo(click.style('Some more text', bg='blue', fg='white'))
-click.echo(click.style('ATTENTION', blink=True, bold=True))
