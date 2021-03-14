@@ -12,7 +12,7 @@ from config import *
 app = Flask(__name__)
 current_node = None
 #replication = 3
-consistency = "eventual"
+#consistency = "eventual"
 #consistency = "chain"
 
 #Starting DHT server
@@ -212,7 +212,7 @@ def find_successor(target_node):
 @app.route("/node/insert_pair/<key>/<value>/<replicas>", methods=["POST", "PUT"])
 def insert_pair(key, value, replicas):
 
-    if consistency == "chain":
+    if CONSISTENCY == "chain":
         # perform a lookup
         successor = current_node.find_successor(current_node.host, key)
 
@@ -245,7 +245,7 @@ def insert_pair(key, value, replicas):
             else:
                 return "ERROR with inserting", 500
 
-    elif consistency == "eventual" :
+    elif CONSISTENCY == "eventual" :
         successor = current_node.find_successor(current_node.host, key)
         if successor == current_node.host:
             current_node.node_storage[key] = value + ":" + replicas
@@ -318,7 +318,7 @@ def query_key(key):
         return query_all()
 
     else:
-        if consistency == "chain":
+        if CONSISTENCY == "chain":
             if key in current_node.node_storage.keys():
                 value = current_node.node_storage[key]
 
@@ -347,7 +347,7 @@ def query_key(key):
                     else:
                         return "Key not found\n", 500
 
-        elif consistency == "eventual":
+        elif CONSISTENCY == "eventual":
             if key in current_node.node_storage.keys():
                 value = current_node.node_storage[key]
                 return json.dumps(value), 200
