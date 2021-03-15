@@ -381,7 +381,7 @@ def find_tail(key):
         url = "http://{0}/node/find_tail/{1}".format(succ, key)
         reply = requests.get(url)
         if reply.status_code == 200:
-            return "find tail", 200
+            return reply.text, 200
         else:
             return "Not Find the tail", 500
 
