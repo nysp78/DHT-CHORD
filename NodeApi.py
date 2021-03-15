@@ -191,6 +191,8 @@ def eventually_transfer(key, value):
 @app.route("/node/find_successor/<target_node>", methods=["GET"])
 def find_successor(target_node):
     successor = current_node.get_succ()
+    if current_node.host == successor:
+        return current_node.host
     hash_succ = sha1(successor.encode()).hexdigest()  # hash succ
     target_id = sha1(target_node.encode()).hexdigest()
     if Node.between_right(target_id, current_node.node_id, hash_succ):
@@ -323,9 +325,12 @@ def query_key(key):
 
                 else:
                     succ = current_node.get_succ()
-                    url = "http://{0}/node/query_key/{1}".format(succ, key)
+                    url = "http://{0}/node/find_tail/{1}".format(succ, key)
                     reply = requests.get(url)
-                    return reply.text, 200
+                    if reply.status_code == 200:
+                        return reply.text, 200
+                    else:
+                        return "ERROR in query"
 
             else:
                 key_succ = current_node.find_successor(current_node.host, key)
@@ -362,6 +367,23 @@ def query_key(key):
 
                     else:
                         return "Key not found\n", 200
+
+
+
+@app.route("/node/find_tail/<key>", methods=["GET"])
+def find_tail(key):
+    value = current_node.node_storage[key]
+    if int(value.split(":")[1]) == 1:
+        return json.dumps(value), 200
+    
+    else:
+        succ = current_node.get_succ()
+        url = "http://{0}/node/find_tail/{1}".format(succ, key)
+        reply = requests.get(url)
+        if reply.status_code == 200:
+            return "find tail", 200
+        else:
+            return "Not Find the tail", 500
 
 
 # return the node storage
