@@ -51,6 +51,7 @@ class Node(object):
                 return False
         pred = self.get_pred()
         try:
+            print("PREDEXESSOR:",pred, "SUCCESSESSOR:", succ)
             url = "http://{0}/node/set_successor/{1}".format(pred, succ) 
             reply = requests.post(url)
             if reply.status_code != 200:
@@ -104,43 +105,22 @@ class Node(object):
 
 
     #function that transfer keys between nodes: departing and join nodes in the ring
-    # chain replication -> not preserve the number of replicas 
-    # eventual consistency -> preserve the number of replicas 
+    #preserve replicas number for both chain & eventual
     def transfer_keys(self, key, target_addr):
-        if CONSISTENCY == "chain":
-            if target_addr == self.host:
-                return 1
-            value = self.node_storage[str(key)]
-            replicas = value.split(":")[1]
-            if replicas == "1":
-                url = "http://{0}/node/send_item/{1}/{2}".format(target_addr, key, value)
-                reply = requests.post(url)
-                if reply.status_code==200:
-                    del self.node_storage[key]
-                    return 1
-                else:
-                    return 0
-            else: 
-                url = "http://{0}/node/send_repl_item/{1}/{2}".format(target_addr, key, value)
-                reply = requests.post(url)
-                if reply.status_code==200:
-                    del self.node_storage[key]
-                    return 1
-                else:
-                    return 0
-                    
-        elif CONSISTENCY == "eventual":
-            if target_addr == self.host:
-                return 1
-            value = self.node_storage[str(key)]
-            url = "http://{0}/node/eventually_transfer/{1}/{2}".format(target_addr, key, value)
-            reply = requests.post(url)
-            if reply.status_code==200:
-                del self.node_storage[key]
-                return 1
+        if target_addr == self.host:
+            return 1
+
+        value = self.node_storage[str(key)]
+
+        url = "http://{0}/node/overall_transfer/{1}/{2}".format(target_addr, key, value)
+        reply = requests.post(url)
             
-            else:
-                return 0
+        if reply.status_code==200:
+            del self.node_storage[key]
+            return 1
+            
+        else:
+            return 0    
 
 #determine the position of node/key in the ring
     @staticmethod

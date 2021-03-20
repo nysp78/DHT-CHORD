@@ -150,41 +150,31 @@ def transfer_keys(target_node):
             else:
                 return abort(500)
 
-#Overwrite key:value:replica
-@app.route("/node/send_item/<key>/<value>", methods=["POST", "PUT"])
-def send_item(key, value):
-    current_node.node_storage[key] = value
-    return "key set", 200
 
 
-
-#Keeps the replication factor and stores it with the key:value[0] it receives
-@app.route("/node/send_repl_item/<key>/<value>", methods=["POST", "PUT"])
-def send_repl_item(key, value):
-    repl = current_node.node_storage[key].split(":")[1]
-    current_node.node_storage[key] = value.split(":")[0] + ":" + repl
-    return "key set", 200
-
-#Preserves the number of replicas by moving forward the keys
-@app.route("/node/eventually_transfer/<key>/<value>", methods = ["POST","PUT"])
-def eventually_transfer(key, value):
+#preserving the number of replicas in the system while a node departing
+@app.route("/node/overall_transfer/<key>/<value>", methods = ["POST","PUT"])
+def overall_transfer(key, value):
     if key in current_node.node_storage.keys():
         before_overwritten = current_node.node_storage[key]
-        if value.split(":")[1] < before_overwritten.split(":")[1]:
-            return "Terminate loop", 200
+        
+        if int(value.split(":")[1]) < int(before_overwritten.split(":")[1]):
+            print("ANTE GAMHSOU PAIDAKI!!!!!!!!!!!!!!!!!!")
+            return "Terminate Loop", 200
+
         current_node.node_storage[key] = value
         succ = current_node.get_succ()
-        url = "http://{0}/node/eventually_transfer/{1}/{2}".format(succ, key, before_overwritten)
+        url = "http://{0}/node/overall_transfer/{1}/{2}".format(succ, key, before_overwritten)
         reply = requests.post(url)
+        
         if reply.status_code == 200 :
             return "Node updated with replica", 200
         else :
             return "Error!!!!!!!!!!!!!!!!!!!", 500
+    
     else:
         current_node.node_storage[key] = value
         return "New tail updated", 200
-
-
 
 
 # Returns successor of the node given a helper node inside the DHT Chord
@@ -370,15 +360,20 @@ def query_key(key):
 
 
 
-@app.route("/node/find_tail/<key>", methods=["GET"])
-def find_tail(key):
-    value = current_node.node_storage[key]
-    if int(value.split(":")[1]) == 1:
+@app.route("/node/find_tail/<key>/<value>", methods=["GET"])
+def find_tail(key, value):
+    before_overwitten = value.split(":")[1]
+    value1 = current_node.node_storage[key]
+    
+    if int(value1.split(":")[1]) >= int(before_overwitten):
         return json.dumps(value), 200
+    
+    elif int(value1.split(":")[1]) == 1:
+        return json.dumps(value1), 200
     
     else:
         succ = current_node.get_succ()
-        url = "http://{0}/node/find_tail/{1}".format(succ, key)
+        url = "http://{0}/node/find_tail/{1}/{2}".format(succ, key, value1)
         reply = requests.get(url)
         if reply.status_code == 200:
             return reply.text, 200
