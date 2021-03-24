@@ -1,5 +1,9 @@
 from argparse import ArgumentParser
+from threading import Thread
+import webbrowser
 import NodeApi
+
+
 
 if __name__ == '__main__':
   parser = ArgumentParser()
@@ -15,4 +19,10 @@ if __name__ == '__main__':
   NodeApi.app.config["PORT"] = args.port
   NodeApi.app.config["ISBOOT"] = args.bootstrap
 
+
+  thread = Thread(target=NodeApi.startServer)
+  thread.daemon = True
+  thread.start() 
   NodeApi.app.run(host=args.ip_address, port=args.port)
+ 
+  

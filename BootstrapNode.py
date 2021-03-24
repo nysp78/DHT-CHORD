@@ -37,7 +37,6 @@ class Bootstrap(Node):
 
     #request from current node to join a node with address 
     def join(self, address):
-        print("JOIN", self.successor, self.host)
         self.number_of_nodes+=1
         self.nodes_dict[address] = address.split(":")[1]
         node_successor = self.find_successor(self.host, address)

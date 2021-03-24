@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for, request, logging, abort
+from flask import Flask, redirect, request, abort
 from hashlib import sha1
 import os
 import requests
@@ -12,14 +12,13 @@ from config import *
 app = Flask(__name__)
 current_node = None
 
+
 #Starting DHT server
-@app.before_first_request
 def startServer():
     global current_node
     ip_addr = app.config["IP"]
     port = app.config["PORT"]
     isboot = app.config["ISBOOT"]
-    print(ip_addr, port)
     try:
         if isboot == 1:
             current_node = Bootstrap(ip_addr, port)
@@ -27,12 +26,22 @@ def startServer():
         else:
             current_node = Node(ip_addr, port)
             print("A node created!")
+            url = "http://{0}/node/join/{1}".format(BOOTSTRAP_ADDR, current_node.host)
+            reply = requests.post(url)
+
+            if reply.status_code == 200:
+                print("A node inserted!")
+                return "Node inserted successfully", 200
+            else:
+                return "Error to join the node", 500
 
         print("The server is up with id:{0}".format(current_node.node_id))
         return "server is ok!", 200
 
     except:
         return "error", abort(500)
+
+#app.before_first_request(startServer)
 
 #Checking if server is alive
 @app.route("/", methods=["GET"])
@@ -41,20 +50,20 @@ def check_server():
 
 
 # add a node in the chord ring
-@app.route('/node/join/', methods=['POST', 'PUT'])
-def join():
+@app.route('/node/join/<addr>', methods=['POST', 'PUT'])
+def join(addr):
     
     #a list of nodes that are inserted in chord
-    addrs = [NODE_ADDR1, NODE_ADDR2, NODE_ADDR3, NODE_ADDR4, 
-                                    NODE_ADDR5, NODE_ADDR6, NODE_ADDR7, NODE_ADDR8, NODE_ADDR9]
+   # addrs = [NODE_ADDR1, NODE_ADDR2, NODE_ADDR3, NODE_ADDR4, 
+                                 #   NODE_ADDR5, NODE_ADDR6, NODE_ADDR7, NODE_ADDR8, NODE_ADDR9]
 
     try:
-        for addr in addrs:
-            current_node.join(addr)
+       # for addr in addrs:
+        current_node.join(addr)
         return "ok\n", 200
 
     except:
-        raise ConnectionAbortedError
+        return " MPIKA EDW ", 500
 
 
 
@@ -138,19 +147,88 @@ def notify():
 
 
 # Transfer keys from the successor to the node
-@app.route("/node/transfer_keys/<target_node>", methods=["POST, PUT"])
+@app.route("/node/transfer_keys/<target_node>", methods=["POST", "PUT"])
 def transfer_keys(target_node):
     keys = current_node.node_storage.keys()  # obtain keys
+    keys = list(keys)
+ 
     for key in keys:
-        key_unh = int(key.decode())
-        if not Node.between_right(key_unh, hashing(target_node), current_node.node_id):
-            trans_key = current_node.transfer_keys(key_unh, target_node)
-            if trans_key:
-                return "Key transferred", 200
+        print("KEY:->", key)
+        key_unh = hashing(key)
+        if Node.between_right(key_unh, hashing(target_node), current_node.node_id):
+            continue
+        trans_key = current_node.transfer_keys_join(key, target_node)
+        print("TRANS KEY:", trans_key)
+        if trans_key:
+            url = "http://{0}/node/update_replica_factor/{1}".format(current_node.host, key)
+        
+            reply = requests.post(url)
+
+            if reply.status_code == 200:
+                continue
             else:
-                return abort(500)
+                return "GIANNH TON FAGATE", 500
+        else:
+            return "KEY NOT TRANSFERED", 200
+
+    return "KEYS TRANSFERRED", 200
+        
+        
+@app.route("/node/update_replica_factor/<key>", methods = ["POST", "PUT"])
+def update_replica_factor(key):
+    replica = int(current_node.node_storage[key].split(":")[1]) - 1
+    value = current_node.node_storage[key].split(":")[0]
+    new_val = value + ":" + str(replica)
+    current_node.node_storage[key] = new_val
+
+    if replica == 0:
+        del current_node.node_storage[key]
+        return "Replicas updated", 200
+        
+    #check if number of replicas less than number of nodes in order to add a replica when node joins
+    succ = current_node.get_succ()
+    url = "http://{0}/node/check_replica_factor/{1}/{2}".format(succ, key, replica + 1)
+    reply = requests.get(url)
+    url = "http://{0}/node/replica_vs_number_of_nodes".format(BOOTSTRAP_ADDR)
+    less_nodes_than_replication = requests.get(url)
+    if reply.status_code == 200 and less_nodes_than_replication.status_code == 200:
+        return "Replicas updated", 200
+    elif reply.status_code == 200 :
+        del current_node.node_storage[key]
+        return "Replicas updated", 200
+
+    url = "http://{0}/node/update_replica_factor/{1}".format(succ, key)
+    reply = requests.post(url)
+    if reply.status_code == 200:
+        return "Replicas updated", 200
+    else :
+        return "Error while updating replicas", 500
 
 
+#transfer keys back when a node joins chord
+@app.route("/node/transfer_back/<key>/<value>", methods = ["POST","PUT"])
+def transfer_back_keys(key, value):
+
+    current_node.node_storage[key] = value
+    return "key transfered", 200
+    
+
+@app.route("/node/check_replica_factor/<key>/<replica>", methods = ["GET"])
+def check_replica_factor(key, replica):
+    curr_repl = int(current_node.node_storage[key].split(":")[1])
+    repl = int(replica)
+
+    if repl < curr_repl:
+        return "Breaking", 200
+    
+    else:
+        return "Not breaking", 500
+
+@app.route("/node/replica_vs_number_of_nodes", methods = ["GET"])
+def replica_vs_number_of_nodes_():
+    if current_node.number_of_nodes < REPLICATION :
+        return "Less nodes than replica" ,200
+    
 
 #preserving the number of replicas in the system while a node departing
 @app.route("/node/overall_transfer/<key>/<value>", methods = ["POST","PUT"])
@@ -274,6 +352,11 @@ def eventual_threading_replicas_storing(key, value, replicas, succ_addr):
 #Stores to k-1 nodes the key:value:replicas tuples used from chain replication and eventual consistency
 @app.route("/node/store_replicas/<key>/<value>/<replicas>", methods=["POST", "PUT"])
 def store_replicas(key, value, replicas):
+    #Check if current replica factor > replica factor received in order to break and preserve the declining order of the chain
+    if key in current_node.node_storage:
+        if int(current_node.node_storage[key].split(":")[1]) > int(replicas):
+            return "Replicas inserted to chord\n", 200
+    
     replicas = int(replicas)
     replicas -= 1
     if int(replicas) > 0:
@@ -315,7 +398,7 @@ def query_key(key):
 
                 else:
                     succ = current_node.get_succ()
-                    url = "http://{0}/node/find_tail/{1}".format(succ, key)
+                    url = "http://{0}/node/find_tail/{1}/{2}".format(succ, key, value)
                     reply = requests.get(url)
                     if reply.status_code == 200:
                         return reply.text, 200

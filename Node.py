@@ -4,7 +4,7 @@ import requests
 import sys
 import time
 from flask.json import JSONEncoder, JSONDecoder
-from flask import Flask, redirect, url_for, request, logging, abort, render_template
+from flask import Flask, redirect, request, abort
 import json
 from config import *
 
@@ -45,7 +45,7 @@ class Node(object):
         succ = self.get_succ()
         keys = list(self.node_storage.keys())        
         for key in keys:
-            transferred = self.transfer_keys(key, succ) 
+            transferred = self.transfer_keys_depart(key, succ) 
             if not transferred:
                 print("KEYS NOT TRANSFERRED!!!!!!!!!!!!!!!!!!!")
                 return False
@@ -84,6 +84,7 @@ class Node(object):
 
     #update the successor of the this node
     def update_successor(self, res):
+        #previous_succ = self.successor
         self.succ_lock.acquire()
         self.successor = res
         self.succ_lock.release()
@@ -103,10 +104,26 @@ class Node(object):
         self.predecessor = res
         self.pred_lock.release()
 
+    
+    def transfer_keys_join(self, key, target_addr):
 
-    #function that transfer keys between nodes: departing and join nodes in the ring
+        if target_addr == self.host:
+            return 1
+        
+        value = self.node_storage[str(key)]
+        url = "http://{0}/node/transfer_back/{1}/{2}".format(target_addr, key, value)
+        reply = requests.post(url)
+            
+        if reply.status_code==200:
+            return 1
+            
+        else:
+            return 0    
+
+
+    #function that transfer keys between nodes: departing  nodes in the ring
     #preserve replicas number for both chain & eventual
-    def transfer_keys(self, key, target_addr):
+    def transfer_keys_depart(self, key, target_addr):
         if target_addr == self.host:
             return 1
 
@@ -188,7 +205,8 @@ class Node(object):
         succ_id = hashing(succ)
 
         if Node.between(x_id, node.node_id, succ_id):
-            node.update_successor(x)
+            print("SUCCESOR = {0} **************************************".format(x))
+            node.set_successor(x)
 
         url = 'http://{0}/node/notify?addr={1}'.format(node.get_succ(), node.host) #node notify his successor for being his pred
         r = requests.post(url)
