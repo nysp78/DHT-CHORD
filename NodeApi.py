@@ -253,8 +253,7 @@ def check_replica_factor(key, replica):
 def replica_vs_number_of_nodes_():
     if current_node.number_of_nodes < REPLICATION :
         return "Less nodes than replica" ,200
-    else :
-        return "Not less nodes than replicas", 301
+    else : return "Not less nodes than replicas", 301
     
 
 #preserving the number of replicas in the system while a node departing
