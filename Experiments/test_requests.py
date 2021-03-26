@@ -1,6 +1,6 @@
 import numpy as np
 import sys 
-sys.path.append("/home/panos/Documents/Distributed Systems 2020/CHORDv2")
+sys.path.append("/home/panos/Documents/Distributed Systems 2020/CHORDv2") #INSERT THE PROJECT PATH
 from config import *
 import requests
 import time
