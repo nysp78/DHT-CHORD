@@ -1,6 +1,6 @@
 import numpy as np
 import sys 
-sys.path.append("/home/panos/Documents/Distributed Systems 2020/CHORDv2")
+sys.path.append("/home/panos/Documents/Distributed Systems 2020/CHORDv2") #INSERT THE PROJECT PATH
 from config import *
 import requests
 import time
@@ -9,10 +9,6 @@ node_list = [BOOTSTRAP_ADDR, NODE_ADDR1, NODE_ADDR2, NODE_ADDR3, NODE_ADDR4,
                                         NODE_ADDR5, NODE_ADDR6, NODE_ADDR7, NODE_ADDR8, NODE_ADDR9]
 
 
-
-
-"""Reads requests from filename and forwards
-each of them to a random server"""
 
 start = time.time()
 query_count = 0
